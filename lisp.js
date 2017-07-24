@@ -118,8 +118,14 @@ const defaultMacros = {
   ',' (...args) {
     return `${args.join(', ')}`
   },
-  'func' (args, body) {
-    return `(function (${args}) { return (${body}) })`
+  'func' (body) {
+    return `(function (...args) { return (${body}) })`
+  },
+  'call' (obj, method, ...args) {
+    return `(${obj}.${method}(${args.join(', ')}))`
+  },
+  'macro' (name, func) {
+    defaultMacros[name] = eval(func)
   }
 }
 
@@ -179,8 +185,11 @@ function lisp (code, macros = defaultMacros) {
 //         i)))
 //     (range 1 101))
 // `)
-let add = lisp(`
-  (func (, a b) (+ a b))
+lisp(`
+  (macro *
+    (func (call args join '*')))
 `)
 
-console.log(add(10, 5))
+console.log(lisp(`
+  (* 1 2 3)
+`))
