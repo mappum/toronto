@@ -49,8 +49,35 @@ function parse (code) {
   return tree
 }
 
-console.log(JSON.stringify(parse(`
+const defaultMacros = {
+  '+' (...args) {
+    return '(' + args.join(' + ') + ')'
+  },
+  '-' (...args) {
+    args.unshift('0') // handle single args (`(- 5)` should be -5)
+    return '(' + args.join(' - ') + ')'
+  },
+  'foo' (a, b, c, d) {
+    return `console.log(${a} + ${b}, ${c} + ${d})`
+  }
+}
+
+function transform (tree, macros = defaultMacros) {
+  let [ operator, ...expressions ] = tree
+  let args = expressions.map((expression) => {
+    if (Array.isArray(expression)) {
+      return transform(expression, macros)
+    }
+    return expression
+  })
+  let macro = macros[operator]
+  return macro(...args)
+}
+
+let tree = parse(`
   (foo 1 2
     (+ 3 4 (- 5))
     (+ 1 2))
-`), null, '  '))
+`)
+console.log(JSON.stringify(tree, null, '  '))
+console.log(transform(tree))
