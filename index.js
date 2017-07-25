@@ -1,99 +1,90 @@
+let noop = (v) => v
+
 function isWhitespace (str) {
   return str.match(/\s/)
 }
 
-let immediateTokenizer = {
-  name: 'immediate',
-  isStart (nextChar, isParentEnd) {
-    while (true) {
-      let char = nextChar()
-      if (isWhitespace(char) || isParentEnd()) return true
+// lets you read chars, and optionally reset the cursor to where it was before reading
+function createCharReader (nextChar, rewind) {
+  let charsRead = 0
+  return {
+    nextChar () {
+      charsRead += 1
+      return nextChar()
+    },
+    reset () {
+      rewind(charsRead)
+      charsRead = 0
+    },
+    rewind (n = 1) {
+      rewind(n)
+      charsRead -= n
     }
-  },
-  isEnd: () => true
+  }
+}
+
+function recursiveTokenizer (isStart, isEnd, toValue = noop) {
+  return function readRecursive (nextChar, rewind, tokenizers) {
+    if (!isStart(nextChar, rewind)) return null
+
+    let value = []
+
+    // calls isEnd, and rewinds cursor if result is false
+    let wrappedIsEnd = (reset) => {
+      let reader = createCharReader(nextChar, rewind)
+      let end = isEnd(reader.nextChar, reader.rewind)
+      if (!end || reset) reader.reset()
+      return end
+    }
+
+    // read children until we reach the end of this token
+    while (true) {
+      if (wrappedIsEnd()) return toValue(value)
+      let child = readToken(nextChar, rewind, tokenizers, wrappedIsEnd)
+      if (child) value.push(child)
+    }
+  }
+}
+
+function readToken (nextChar, rewind, tokenizers, ...extraArgs) {
+  let reader = createCharReader(nextChar, rewind)
+  for (let read of tokenizers) {
+    let value = read(reader.nextChar, reader.rewind, tokenizers, ...extraArgs)
+    if (value != null) return value
+    reader.reset()
+  }
+  throw Error('Could not parse token')
+}
+
+function bracketed (open, close, toValue) {
+  return recursiveTokenizer(
+    (nextChar) => nextChar() === open,
+    (nextChar) => nextChar() === close,
+    toValue
+  )
 }
 
 let defaultTokenizers = [
-  {
-    name: 'expression',
-    isStart: (nextChar) => nextChar() === '(',
-    isEnd: (nextChar) => nextChar() === ')',
-    toValue: (...args) => args
-  }, {
-    name: 'squareBracketList',
-    isStart: (nextChar) => nextChar() === '[',
-    isEnd: (nextChar) => nextChar() === ']',
-    toValue: (...args) => [ 'vec', ...args ]
-  },
-  immediateTokenizer
+  bracketed('(', ')'),
+  bracketed('[', ']', (args) => [ 'vec', ...args ]),
+  function immediate (nextChar, rewind, _, isParentEnd) {
+    let value = ''
+    while (true) {
+      if (isParentEnd && isParentEnd(true)) {
+        return value
+      }
+      let char = nextChar()
+      if (!char || isWhitespace(char)) return value
+      value += char
+    }
+  }
 ]
 
 function parse (code, tokenizers = defaultTokenizers) {
-  code = code.trim().replace(/\n/g, '')
-
-  let tree = []
-  let stack = []
-  let peek = () => stack[stack.length - 1]
-  let i = 0
-  let nextChar = () => code[i++]
-  let isParentEnd = () => {
-    if (stack.length === 0) return i >= code.length
-    let cursor = i
-    let isEnd = peek().tokenizer.isEnd(nextChar)
-    i = cursor
-    return isEnd
-  }
-
-  function readToken () {
-    // terminate token currently being read
-    let start = i
-    if (peek() && peek().tokenizer.isEnd(nextChar)) {
-      let { tokenizer, children, start } = stack.pop()
-
-      let value
-      if (tokenizer === immediateTokenizer) {
-        // special case: token is immediate value
-        value = code.slice(start, i).trim()
-        if (!value) return
-      } else {
-        value = tokenizer.toValue(...children)
-      }
-
-      if (stack.length === 0) {
-        // top-level token, this is the root of the tree
-        tree = value
-      } else {
-        // child token, push to parent
-        peek().children.push(value)
-      }
-
-      return
-    } else {
-      // reset cursor from before irrelevant `isEnd` call
-      i = start
-    }
-
-    // push new tokens on the stack
-    for (let tokenizer of tokenizers) {
-      let start = i
-      if (!tokenizer.isStart(nextChar, isParentEnd)) {
-        i = start // reset cursor
-        continue
-      }
-      stack.push({ tokenizer, start })
-      if (tokenizer !== immediateTokenizer) {
-        peek().children = []
-      }
-      return
-    }
-  }
-
-  while (i < code.length) {
-    readToken()
-  }
-  if (stack.length > 0) readToken()
-
-  return tree
+  let cursor = 0
+  let nextChar = () => code[cursor++]
+  let rewind = (n = 1) => cursor -= n
+  return readToken(nextChar, rewind, tokenizers)
 }
 
 function * range (min = 0, max) {
@@ -124,9 +115,6 @@ const defaultMacros = {
   },
   '%' (a, b) {
     return `(${a} % ${b})`
-  },
-  'foo' (a, b, c, d) {
-    return `console.log(${a} + ${b}, ${c} + ${d})`
   },
   'map' (func, iterator) {
     return `mapIterator(${func}, ${iterator})`
@@ -197,6 +185,13 @@ function transform (tree, macros = defaultMacros) {
 }
 
 function evalLisp (code, macros = defaultMacros, tokenizers = defaultTokenizers) {
+  if (Array.isArray(code)) {
+    // called as template string tag
+    code = String.raw(...Array.from(arguments))
+    macros = defaultMacros
+    tokenizers = defaultTokenizers
+  }
+
   let tree = parse(code, tokenizers)
   let js = `
     (function () {
