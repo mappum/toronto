@@ -1,9 +1,13 @@
+function isWhitespace (str) {
+  return str.match(/\s/)
+}
+
 let immediateTokenizer = {
   name: 'immediate',
   isStart (nextChar, isParentEnd) {
     while (true) {
       let char = nextChar()
-      if (char === ' ' || isParentEnd()) return true
+      if (isWhitespace(char) || isParentEnd()) return true
     }
   },
   isEnd: () => true
@@ -33,7 +37,7 @@ function parse (code, tokenizers = defaultTokenizers) {
   let i = 0
   let nextChar = () => code[i++]
   let isParentEnd = () => {
-    if (stack.length === 0) return false
+    if (stack.length === 0) return i >= code.length
     let cursor = i
     let isEnd = peek().tokenizer.isEnd(nextChar)
     i = cursor
@@ -87,6 +91,7 @@ function parse (code, tokenizers = defaultTokenizers) {
   while (i < code.length) {
     readToken()
   }
+  if (stack.length > 0) readToken()
 
   return tree
 }
@@ -195,5 +200,5 @@ function lisp (code, macros = defaultMacros) {
 }
 
 console.log(parse(`
-  (func [a b] (+ a b))
+  (foo [a b] aasdflkjlasfdj)
 `))
