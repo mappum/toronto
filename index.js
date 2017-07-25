@@ -173,6 +173,9 @@ const defaultMacros = {
   },
   'macro' (name, func) {
     defaultMacros[name] = eval(func)
+  },
+  'toArray' (iterator) {
+    return `(Array.from(${iterator}))`
   }
 }
 
@@ -193,12 +196,20 @@ function transform (tree, macros = defaultMacros) {
   return macro(...args)
 }
 
-function lisp (code, macros = defaultMacros) {
-  let tree = parse(code)
-  let js = transform(tree, macros)
+function evalLisp (code, macros = defaultMacros, tokenizers = defaultTokenizers) {
+  let tree = parse(code, tokenizers)
+  let js = `
+    (function () {
+      ${range.toString()};
+      ${mapIterator.toString()};
+      return ${transform(tree, macros)}
+    })()
+  `
   return eval(js)
 }
 
-console.log(parse(`
-  (foo [a b] aasdflkjlasfdj)
-`))
+module.exports = evalLisp
+module.exports.parse = parse
+module.exports.transform = transform
+module.exports.defaultMacros = defaultMacros
+module.exports.defaultTokenizers = defaultTokenizers
