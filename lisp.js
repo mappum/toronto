@@ -1,50 +1,92 @@
-function parse (code) {
+let immediateTokenizer = {
+  name: 'immediate',
+  isStart (nextChar, isParentEnd) {
+    while (true) {
+      let char = nextChar()
+      if (char === ' ' || isParentEnd()) return true
+    }
+  },
+  isEnd: () => true
+}
+
+let defaultTokenizers = [
+  {
+    name: 'expression',
+    isStart: (nextChar) => nextChar() === '(',
+    isEnd: (nextChar) => nextChar() === ')',
+    toValue: (...args) => args
+  }, {
+    name: 'squareBracketList',
+    isStart: (nextChar) => nextChar() === '[',
+    isEnd: (nextChar) => nextChar() === ']',
+    toValue: (...args) => [ 'vec', ...args ]
+  },
+  immediateTokenizer
+]
+
+function parse (code, tokenizers = defaultTokenizers) {
   code = code.trim().replace(/\n/g, '')
 
   let tree = []
   let stack = []
-  let i = 0
-
   let peek = () => stack[stack.length - 1]
-
-  function * chars () {
-    while (i < code.length) yield code[i++]
+  let i = 0
+  let nextChar = () => code[i++]
+  let isParentEnd = () => {
+    if (stack.length === 0) return false
+    let cursor = i
+    let isEnd = peek().tokenizer.isEnd(nextChar)
+    i = cursor
+    return isEnd
   }
 
   function readToken () {
+    // terminate token currently being read
     let start = i
-    let length = 0
-    for (let char of chars()) {
-      if (char === ' ' || char === ')') {
-        if (char === ')') i -= 1 // re-emit bracket
-        return code.slice(start, start + length)
+    if (peek() && peek().tokenizer.isEnd(nextChar)) {
+      let { tokenizer, children, start } = stack.pop()
+
+      let value
+      if (tokenizer === immediateTokenizer) {
+        // special case: token is immediate value
+        value = code.slice(start, i).trim()
+        if (!value) return
+      } else {
+        value = tokenizer.toValue(...children)
       }
-      length++
-    }
-  }
 
-  for (let char of chars()) {
-    if (char === '(') {
-      // start of an expression
-      let parent = peek()
-      let expression = []
-      stack.push(expression)
-      if (parent) parent.push(expression)
-    } else if (char === ')') {
-      // end of expression
-      let expression = stack.pop()
-      if (stack.length === 0) tree.push(expression)
-    } else if (char === ' ') {
-      // end of token, no-op
+      if (stack.length === 0) {
+        // top-level token, this is the root of the tree
+        tree = value
+      } else {
+        // child token, push to parent
+        peek().children.push(value)
+      }
+
+      return
     } else {
-      // token separator
-      i -= 1 // re-emit token's first char
-      peek().push(readToken())
+      // reset cursor from before irrelevant `isEnd` call
+      i = start
+    }
+
+    // push new tokens on the stack
+    for (let tokenizer of tokenizers) {
+      let start = i
+      if (!tokenizer.isStart(nextChar, isParentEnd)) {
+        i = start // reset cursor
+        continue
+      }
+      stack.push({ tokenizer, start })
+      if (tokenizer !== immediateTokenizer) {
+        peek().children = []
+      }
+      return
     }
   }
 
-  // if there is only one top-level expression, it should be the root
-  if (tree.length === 1) tree = tree[0]
+  while (i < code.length) {
+    readToken()
+  }
 
   return tree
 }
@@ -152,44 +194,6 @@ function lisp (code, macros = defaultMacros) {
   return eval(js)
 }
 
-// let tree = parse(`
-//   (foo 1 2
-//     (+ 3 4 (- 5))
-//     (+ 1 2))
-// `)
-// let tree = parse(`
-//   (map
-//     (=> i
-//       (print
-//         (? (% i 15)
-//         (? (% i 3)
-//         (? (% i 5) i 'buzz') 'fizz') 'fizzbuzz')))
-//     (range 1 101))
-// `)
-// let tree = parse(`
-//   (map
-//     (=> i
-//       (print (cond
-//         (! (% i 15)) 'fizzbuzz'
-//         (! (% i 3)) 'fizz'
-//         (! (% i 5)) 'buzz'
-//         i)))
-//     (range 1 101))
-// `)
-// let tree = parse(`
-//   (map
-//     (=> i
-//       (print (or (+
-//         (? (% i 3) '' 'fizz')
-//         (? (% i 5) '' 'buzz'))
-//         i)))
-//     (range 1 101))
-// `)
-lisp(`
-  (macro *
-    (func (call args join '*')))
-`)
-
-console.log(lisp(`
-  (* 1 2 3)
+console.log(parse(`
+  (func [a b] (+ a b))
 `))
