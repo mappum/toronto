@@ -67,6 +67,23 @@ function bracketed (open, close, toValue) {
 let defaultTokenizers = [
   bracketed('(', ')'),
   bracketed('[', ']', (args) => [ 'vec', ...args ]),
+  function string (nextChar) {
+    let quote = nextChar()
+    if (quote !== "'" && quote !== '"') return null
+    let value = ''
+    let escaped = false
+    while (true) {
+      let char = nextChar()
+      if (!escaped && char === '\\') {
+        escaped = true
+      } else if (!escaped && char === quote) {
+        return quote + value + quote
+      } else if (escaped) {
+        escaped = false
+      }
+      value += char
+    }
+  },
   function immediate (nextChar, rewind, _, isParentEnd) {
     let value = ''
     while (true) {
@@ -193,6 +210,7 @@ function evalLisp (code, macros = defaultMacros, tokenizers = defaultTokenizers)
   }
 
   let tree = parse(code, tokenizers)
+  // TODO: figure out how to handle runtime functions referenced by macros (range, mapIterator)
   let js = `
     (function () {
       ${range.toString()};
