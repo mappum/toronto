@@ -66,7 +66,7 @@ function bracketed (open, close, toValue) {
 
 let defaultTokenizers = [
   bracketed('(', ')'),
-  bracketed('[', ']', (args) => [ 'vec', ...args ]),
+  bracketed('[', ']', (args) => [ '[]', ...args ]),
   function string (nextChar) {
     let quote = nextChar()
     if (quote !== "'" && quote !== '"') return null
@@ -98,6 +98,7 @@ let defaultTokenizers = [
 ]
 
 function parse (code, tokenizers = defaultTokenizers) {
+  code = code.trim()
   let cursor = 0
   let nextChar = () => code[cursor++]
   let rewind = (n = 1) => cursor -= n
@@ -134,13 +135,13 @@ const defaultMacros = {
     return `(${a} % ${b})`
   },
   'map' (func, iterator) {
-    return `mapIterator(${func}, ${iterator})`
+    return `(${mapIterator.toString()})(${func}, ${iterator})`
   },
   '=>' (arg, expression) {
     return `(${arg}) => (${expression})`
   },
   'range' (...args) {
-    return `range(${args.join(', ')})`
+    return `(${range.toString()})(${args.join(', ')})`
   },
   '?' (cond, a, b = undefined) {
     return `(${cond} ? ${a} : ${b})`
@@ -170,8 +171,19 @@ const defaultMacros = {
   ',' (...args) {
     return `${args.join(', ')}`
   },
-  'func' (body) {
-    return `(function (...args) { return (${body}) })`
+  'func' (params, body) {
+    if (!body) {
+      body = params
+      params = []
+    }
+    if (!Array.isArray(params)) {
+      throw Error('function parameters must be a vector')
+    }
+    return `
+    (function (${params.join(', ')}) {
+      return (${body || 'undefined'});
+    })
+    `
   },
   'call' (obj, method, ...args) {
     return `(${obj}.${method}(${args.join(', ')}))`
@@ -181,10 +193,16 @@ const defaultMacros = {
   },
   'toArray' (iterator) {
     return `(Array.from(${iterator}))`
+  },
+  '.' (...args) {
+    return `(${args.join('.')})`
+  },
+  '[]' (...args) {
+    return args
   }
 }
 
-function transform (tree, macros = defaultMacros) {
+function expand (tree, macros = defaultMacros) {
   let [ operator, ...expressions ] = tree
   let args = []
   for (let expression of expressions) {
@@ -192,8 +210,8 @@ function transform (tree, macros = defaultMacros) {
       // static token
       args.push(expression)
     } else {
-      // transformable expression
-      args.push(transform(expression, macros))
+      // expandable expression
+      args.push(expand(expression, macros))
     }
   }
   let macro = macros[operator]
@@ -201,7 +219,7 @@ function transform (tree, macros = defaultMacros) {
   return macro(...args)
 }
 
-function evalLisp (code, macros = defaultMacros, tokenizers = defaultTokenizers) {
+function evalExpansion (code, macros = defaultMacros, tokenizers = defaultTokenizers) {
   if (Array.isArray(code)) {
     // called as template string tag
     code = String.raw(...Array.from(arguments))
@@ -210,19 +228,12 @@ function evalLisp (code, macros = defaultMacros, tokenizers = defaultTokenizers)
   }
 
   let tree = parse(code, tokenizers)
-  // TODO: figure out how to handle runtime functions referenced by macros (range, mapIterator)
-  let js = `
-    (function () {
-      ${range.toString()};
-      ${mapIterator.toString()};
-      return ${transform(tree, macros)}
-    })()
-  `
+  let js = expand(tree, macros)
   return eval(js)
 }
 
-module.exports = evalLisp
+module.exports = evalExpansion
 module.exports.parse = parse
-module.exports.transform = transform
+module.exports.expand = expand
 module.exports.defaultMacros = defaultMacros
 module.exports.defaultTokenizers = defaultTokenizers
