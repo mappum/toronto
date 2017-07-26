@@ -183,14 +183,10 @@ const defaultMacros = {
     if (!Array.isArray(params)) {
       throw Error('function parameters must be a vector')
     }
-    return `
-    (function (${params.join(', ')}) {
-      return (${body || 'undefined'});
-    })
-    `
+    return eval(`(function (${params.join(', ')}) { return ${body} })`)
   },
-  'call' (obj, method, ...args) {
-    return `(${obj}.${method}(${args.join(', ')}))`
+  'call' (func, ...args) {
+    return `((${func})(${args.join(', ')}))`
   },
   'macro' (name, func) {
     defaultMacros[name] = eval(func)
@@ -207,16 +203,29 @@ const defaultMacros = {
 }
 
 function expand (tree, macros = defaultMacros) {
-  let [ operator, ...expressions ] = tree
-  let args = []
-  for (let expression of expressions) {
+  let expansion = []
+  for (let expression of tree) {
     if (!Array.isArray(expression)) {
-      // static token
-      args.push(expression)
+      // static value
+      expansion.push(expression)
     } else {
       // expandable expression
-      args.push(expand(expression, macros))
+      let childExpansion = expand(expression, macros)
+      if (expansion.length === 0) {
+        // first list element,
+        // JS code expansion gets evalled at expansion time
+        childExpansion = eval(childExpansion)
+      }
+      expansion.push(childExpansion)
     }
+  }
+  let [ operator, ...args ] = expansion
+
+  if (typeof operator === 'function') {
+    // if operator expanded to a function,
+    // this expression should be a call
+    args.unshift(operator)
+    operator = 'call'
   }
   let macro = macros[operator]
   if (!macro) throw Error(`macro "${operator}" not found`)
