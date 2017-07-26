@@ -132,7 +132,7 @@ const defaultMacros = {
     return '(' + args.join(' + ') + ')'
   },
   '-' (...args) {
-    args.unshift('0') // handle single args (`(- 5)` should be -5)
+    if (args.length === 1) args.unshift('0') // handle single args (`(- 5)` should be -5)
     return '(' + args.join(' - ') + ')'
   },
   '%' (a, b) {
