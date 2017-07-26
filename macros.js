@@ -18,22 +18,41 @@ function mapIterator (func, iterator) {
   return output
 }
 
-let macros = {
-  '+' (...args) {
-    return '(' + args.join(' + ') + ')'
-  },
+function variadicBinaryOperator (operator) {
+  return (...args) => `(${args.join(` ${operator} `)})`
+}
+
+let arithmetic = {
+  '+': variadicBinaryOperator('+'),
   '-' (...args) {
     if (args.length === 1) args.unshift('0') // handle single args (`(- 5)` should be -5)
     return '(' + args.join(' - ') + ')'
   },
-  '%' (a, b) {
-    return `(${a} % ${b})`
-  },
+  '*': variadicBinaryOperator('*'),
+  '/': variadicBinaryOperator('/'),
+  '%': variadicBinaryOperator('%')
+}
+
+let logical = {
+  'or': variadicBinaryOperator('||'),
+  'and': variadicBinaryOperator('&&'),
+  'not': (value) => `(!(${value}))`
+}
+
+let bitwise = {
+  'bor': variadicBinaryOperator('|'),
+  'band': variadicBinaryOperator('&'),
+  'xor': variadicBinaryOperator('^'),
+  'bnot': (value) => `(~(${value}))`
+}
+
+let macros = {
   'map' (func, iterator) {
     return `(${mapIterator.toString()})(${func}, ${iterator})`
   },
-  '=>' (arg, expression) {
-    return `(${arg}) => (${expression})`
+  '=>' (args, expression) {
+    if (Array.isArray(args)) args = args.join(', ')
+    return `(${args}) => (${expression})`
   },
   'range' (...args) {
     return `(${range.toString()})(${args.join(', ')})`
@@ -91,13 +110,19 @@ let macros = {
 }
 
 let scopedMacros = {
-  'let' (name, value) {
+  'def' (name, value) {
     return `(this['${name}'] = ${value})`
   }
 }
 
+Object.assign(
+  macros,
+  arithmetic,
+  logical,
+  bitwise)
+
 // exported value can be used as the collection of macros,
-// or can be called to create a scope for 'let', etc.
+// or can be called to create a scope for 'def', etc.
 module.exports = function createMacroContext (ctx = {}) {
   // clone then re-assign to assure ctx overrides defaults
   let cloned = Object.assign({}, ctx)
@@ -110,3 +135,5 @@ module.exports = function createMacroContext (ctx = {}) {
 
   return Object.assign(ctx, macros, boundScopedMacros, cloned)
 }
+
+Object.assign(module.exports, { macros })

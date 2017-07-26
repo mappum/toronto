@@ -6,7 +6,7 @@ let defaultMacros = require('./macros.js')
 let defaultTokenizers = require('./tokenizers.js')
 
 function evalExpansion (code, macros, tokenizers = defaultTokenizers) {
-  let ctx = this === global ? {} : this
+  let ctx = (this === global ? {} : this) || {}
   if (!macros) macros = defaultMacros(ctx)
 
   if (Array.isArray(code)) {
