@@ -1,21 +1,21 @@
 'use strict'
 
 module.exports = function expand (tree, macros) {
+  if (!Array.isArray(tree)) {
+    // static value
+    return tree
+  }
+
+  // expandable expression
   let expansion = []
   for (let expression of tree) {
-    if (!Array.isArray(expression)) {
-      // static value
-      expansion.push(expression)
-    } else {
-      // expandable expression
-      let childExpansion = expand(expression, macros)
-      if (expansion.length === 0) {
-        // first list element,
-        // JS code expansion gets evalled at expansion time
-        childExpansion = eval(childExpansion)
-      }
-      expansion.push(childExpansion)
+    let childExpansion = expand(expression, macros)
+    if (expansion.length === 0 && Array.isArray(childExpansion)) {
+      // first list element,
+      // JS code expansion gets evalled at expansion time
+      childExpansion = eval(childExpansion)
     }
+    expansion.push(childExpansion)
   }
   let [ operator, ...args ] = expansion
 
