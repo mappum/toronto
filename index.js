@@ -74,6 +74,10 @@ let defaultTokenizers = [
     let escaped = false
     while (true) {
       let char = nextChar()
+      if (!char) {
+        let type = quote === '"' ? 'double' : 'single'
+        throw Error(`unterminated ${type}-quoted string`)
+      }
       if (!escaped && char === '\\') {
         escaped = true
       } else if (!escaped && char === quote) {
