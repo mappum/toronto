@@ -1,6 +1,6 @@
 {
   "name": "toronto",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "A lisp that compiles to JS",
   "main": "index.js",
   "scripts": {
