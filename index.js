@@ -1,252 +1,46 @@
-let noop = (v) => v
+'use strict'
 
-function isWhitespace (str) {
-  return str.match(/\s/)
-}
+let parse = require('./parse.js')
+let expand = require('./expand.js')
+let defaultMacros = require('./macros.js')
+let defaultTokenizers = require('./tokenizers.js')
 
-// lets you read chars, and optionally reset the cursor to where it was before reading
-function createCharReader (nextChar, rewind) {
-  let charsRead = 0
-  return {
-    nextChar () {
-      charsRead += 1
-      return nextChar()
-    },
-    reset () {
-      rewind(charsRead)
-      charsRead = 0
-    },
-    rewind (n = 1) {
-      rewind(n)
-      charsRead -= n
-    }
-  }
-}
+function evalExpansion (code, macros, tokenizers = defaultTokenizers) {
+  let ctx = this === global ? {} : this
+  if (!macros) macros = defaultMacros(ctx)
 
-function recursiveTokenizer (isStart, isEnd, toValue = noop) {
-  return function readRecursive (nextChar, rewind, tokenizers) {
-    if (!isStart(nextChar, rewind)) return null
-
-    let value = []
-
-    // calls isEnd, and rewinds cursor if result is false
-    let wrappedIsEnd = (reset) => {
-      let reader = createCharReader(nextChar, rewind)
-      let end = isEnd(reader.nextChar, reader.rewind)
-      if (!end || reset) reader.reset()
-      return end
-    }
-
-    // read children until we reach the end of this token
-    while (true) {
-      if (wrappedIsEnd()) return toValue(value)
-      let child = readToken(nextChar, rewind, tokenizers, wrappedIsEnd)
-      if (child) value.push(child)
-    }
-  }
-}
-
-function readToken (nextChar, rewind, tokenizers, ...extraArgs) {
-  let reader = createCharReader(nextChar, rewind)
-  for (let read of tokenizers) {
-    let value = read(reader.nextChar, reader.rewind, tokenizers, ...extraArgs)
-    if (value != null) return value
-    reader.reset()
-  }
-  throw Error('Could not parse token')
-}
-
-function bracketed (open, close, toValue) {
-  return recursiveTokenizer(
-    (nextChar) => nextChar() === open,
-    (nextChar) => nextChar() === close,
-    toValue
-  )
-}
-
-let defaultTokenizers = [
-  bracketed('(', ')'),
-  bracketed('[', ']', (args) => [ '[]', ...args ]),
-  function string (nextChar) {
-    let quote = nextChar()
-    if (quote !== "'" && quote !== '"') return null
-    let value = ''
-    let escaped = false
-    while (true) {
-      let char = nextChar()
-      if (!char) {
-        let type = quote === '"' ? 'double' : 'single'
-        throw Error(`unterminated ${type}-quoted string`)
-      }
-      if (!escaped && char === '\\') {
-        escaped = true
-      } else if (!escaped && char === quote) {
-        return quote + value + quote
-      } else if (escaped) {
-        escaped = false
-      }
-      value += char
-    }
-  },
-  function immediate (nextChar, rewind, _, isParentEnd) {
-    let value = ''
-    while (true) {
-      if (isParentEnd && isParentEnd(true)) {
-        return value
-      }
-      let char = nextChar()
-      if (!char || isWhitespace(char)) return value
-      value += char
-    }
-  }
-]
-
-function parse (code, tokenizers = defaultTokenizers) {
-  code = code.trim()
-  let cursor = 0
-  let nextChar = () => code[cursor++]
-  let rewind = (n = 1) => cursor -= n
-  return readToken(nextChar, rewind, tokenizers)
-}
-
-function * range (min = 0, max) {
-  if (max == null) {
-    max = min
-    min = 0
-  }
-  for (let i = min; i < max; i++) {
-    yield i
-  }
-}
-
-function mapIterator (func, iterator) {
-  let output = []
-  for (let value of iterator) {
-    output.push(func(value))
-  }
-  return output
-}
-
-const defaultMacros = {
-  '+' (...args) {
-    return '(' + args.join(' + ') + ')'
-  },
-  '-' (...args) {
-    if (args.length === 1) args.unshift('0') // handle single args (`(- 5)` should be -5)
-    return '(' + args.join(' - ') + ')'
-  },
-  '%' (a, b) {
-    return `(${a} % ${b})`
-  },
-  'map' (func, iterator) {
-    return `(${mapIterator.toString()})(${func}, ${iterator})`
-  },
-  '=>' (arg, expression) {
-    return `(${arg}) => (${expression})`
-  },
-  'range' (...args) {
-    return `(${range.toString()})(${args.join(', ')})`
-  },
-  '?' (cond, a, b = undefined) {
-    return `(${cond} ? ${a} : ${b})`
-  },
-  '!' (expression) {
-    return `!(${expression})`
-  },
-  'print' (...args) {
-    return `(console.log(${args.join(', ')}))`
-  },
-  'cond' (...args) {
-    let output = ''
-    let hasElse = args.length % 2 === 1
-    let elseValue = hasElse ? args[args.length - 1] : 'undefined'
-    let last = true
-    for (let i = args.length - 2 - (hasElse ? 1 : 0); i >= 0; i -= 2) {
-      let condition = args[i]
-      let value = args[i + 1]
-      output = `(${condition} ? ${value} : ${last ? elseValue : output})`
-      last = false
-    }
-    return output
-  },
-  'or' (a, b) {
-    return `(${a} || ${b})`
-  },
-  ',' (...args) {
-    return `${args.join(', ')}`
-  },
-  'func' (params, body) {
-    if (!body) {
-      body = params
-      params = []
-    }
-    if (!Array.isArray(params)) {
-      throw Error('function parameters must be a vector')
-    }
-    return eval(`(function (${params.join(', ')}) { return ${body} })`)
-  },
-  'call' (func, ...args) {
-    return `((${func})(${args.join(', ')}))`
-  },
-  'macro' (name, func) {
-    defaultMacros[name] = eval(func)
-  },
-  'toArray' (iterator) {
-    return `(Array.from(${iterator}))`
-  },
-  '.' (...args) {
-    return `(${args.join('.')})`
-  },
-  '[]' (...args) {
-    return args
-  }
-}
-
-function expand (tree, macros = defaultMacros) {
-  let expansion = []
-  for (let expression of tree) {
-    if (!Array.isArray(expression)) {
-      // static value
-      expansion.push(expression)
-    } else {
-      // expandable expression
-      let childExpansion = expand(expression, macros)
-      if (expansion.length === 0) {
-        // first list element,
-        // JS code expansion gets evalled at expansion time
-        childExpansion = eval(childExpansion)
-      }
-      expansion.push(childExpansion)
-    }
-  }
-  let [ operator, ...args ] = expansion
-
-  if (typeof operator === 'function') {
-    // if operator expanded to a function,
-    // this expression should be a call
-    args.unshift(operator)
-    operator = 'call'
-  }
-  let macro = macros[operator]
-  if (!macro) throw Error(`macro "${operator}" not found`)
-  return macro(...args)
-}
-
-function evalExpansion (code, macros = defaultMacros, tokenizers = defaultTokenizers) {
   if (Array.isArray(code)) {
     // called as template string tag
     code = String.raw(...Array.from(arguments))
-    macros = defaultMacros
+    macros = defaultMacros(ctx)
     tokenizers = defaultTokenizers
+  } else if (typeof code === 'object') {
+    // return eval function, bound to context object
+    ctx = code
+    macros = defaultMacros(ctx)
+    return attachMethods(function evalExpansionCtx (code) {
+      return evalExpansion.call(ctx, code, macros, tokenizers)
+    })
   }
 
   let tree = parse(code, tokenizers)
   let js = expand(tree, macros)
-  return eval(js)
+  return new Function('ctx', `
+    with (ctx) { return (${js}) }
+  `).call(ctx, ctx)
 }
 
-module.exports = evalExpansion
-module.exports.parse = parse
-module.exports.expand = expand
-module.exports.defaultMacros = defaultMacros
-module.exports.defaultTokenizers = defaultTokenizers
+function attachMethods (obj) {
+  return Object.assign(obj, {
+    parse (code, tokenizers = defaultTokenizers) {
+      return parse(code, tokenizers)
+    },
+    expand (tree, macros = defaultMacros({})) {
+      return expand(tree, macros)
+    },
+    macros: defaultMacros,
+    tokenizers: defaultTokenizers
+  })
+}
+
+module.exports = attachMethods(evalExpansion)
