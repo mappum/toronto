@@ -107,6 +107,27 @@ let macros = {
   '[]' (...args) {
     return args
   },
+  '{}' (...args) {
+    let json = ''
+    for (let i = 0; i < args.length; i += 2) {
+      let key = args[i]
+      let value = args[i + 1]
+      // ensure keys are followed by colons
+      if (value === ':' && key[key.length - 1] !== ':') {
+        key = key + ':'
+        value = args[i + 2]
+        i += 1
+      } else if (key[key.length - 1] !== ':') {
+        throw Error('Expected JS object key to end with ":"')
+      }
+      // make sure we don't get mistake keys for values
+      if (value[value.length - 1] === ':') {
+        throw Error('Expected JS object value to not end with ":"')
+      }
+      json += `  ${key} ${value},\n`
+    }
+    return `{\n${json}\n}`
+  },
   'do' (...expressions) {
     return '((function () {\n  ' +
       expressions.join(';\n  ') +

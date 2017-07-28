@@ -49,6 +49,8 @@ let tokenizers = [
   bracketed('(', ')'),
   // square bracket vectors
   bracketed('[', ']', (args) => [ '[]', ...args ]),
+  // JS object
+  bracketed('{', '}', (args) => [ '{}', ...args ]),
   // js strings (single-quoted or double-quoted)
   function string (nextChar) {
     let quote = nextChar()
