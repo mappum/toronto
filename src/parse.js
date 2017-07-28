@@ -21,6 +21,7 @@ function parse (code, tokenizers) {
   while (cursor < code.length) {
     tree.push(readToken(nextChar, rewind, tokenizers))
   }
+  if (tree.length === 2) return tree[1]
   return tree
 }
 
