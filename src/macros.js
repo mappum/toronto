@@ -18,6 +18,10 @@ function mapIterator (func, iterator) {
   return output
 }
 
+function arrayToString () {
+  return `[${this.join(',')}]`
+}
+
 function variadicBinaryOperator (operator) {
   return (...args) => `(${args.join(` ${operator} `)})`
 }
@@ -105,6 +109,7 @@ let macros = {
     return `(${args.join('.')})`
   },
   '[]' (...args) {
+    args.toString = arrayToString
     return args
   },
   '{}' (...args) {
@@ -132,6 +137,9 @@ let macros = {
     return '((function () {\n  ' +
       expressions.join(';\n  ') +
       ';\n})())'
+  },
+  'eval' (code) {
+    return eval(code)
   }
 }
 

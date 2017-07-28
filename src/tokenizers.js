@@ -11,7 +11,7 @@ function isWhitespace (str) {
 
 // generates a tokenizer which has a start sequence,
 // read child tokens, and has an end sequence
-function recursive (isStart, isEnd, toValue = noop) {
+function recursive (isStart, isEnd, transform = noop) {
   return function readRecursive (nextChar, rewind, tokenizers) {
     if (!isStart(nextChar, rewind)) return null
 
@@ -27,7 +27,7 @@ function recursive (isStart, isEnd, toValue = noop) {
 
     // read children until we reach the end of this token
     while (true) {
-      if (wrappedIsEnd()) return toValue(value)
+      if (wrappedIsEnd()) return transform(value)
       let child = readToken(nextChar, rewind, tokenizers, wrappedIsEnd)
       if (child) value.push(child)
     }
@@ -36,17 +36,36 @@ function recursive (isStart, isEnd, toValue = noop) {
 
 // returns a recursive tokenizer which has an opening
 // bracket char and a closing bracket char
-function bracketed (open, close, toValue) {
+function bracketed (open, close, transform = noop) {
   return recursive(
     (nextChar) => nextChar() === open,
     (nextChar) => nextChar() === close,
-    toValue
+    transform
   )
 }
 
+function prefixed (prefix, tokenizer, transform = noop) {
+  return function readPrefixed (nextChar, ...extraArgs) {
+    // check if token starts with prefix
+    for (let i = 0; i < prefix.length; i++) {
+      if (nextChar() !== prefix[i]) return null
+    }
+
+    // read child token
+    let value = tokenizer(nextChar, ...extraArgs)
+    if (value) value = transform(value)
+    return value
+  }
+}
+
+let parantheticExpression = bracketed('(', ')')
+
 let tokenizers = [
-  // paranthetic expressions
-  bracketed('(', ')'),
+  // normal paranthetic expressions
+  parantheticExpression,
+  // paranthetic expressions prefixed with period (to eval at expansion-time)
+  prefixed('.', parantheticExpression,
+    (...args) => [ 'eval', ...args ]),
   // square bracket vectors
   bracketed('[', ']', (args) => [ '[]', ...args ]),
   // JS object
