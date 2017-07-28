@@ -17,7 +17,11 @@ function parse (code, tokenizers) {
   let cursor = 0
   let nextChar = () => code[cursor++]
   let rewind = (n = 1) => cursor -= n
-  return readToken(nextChar, rewind, tokenizers)
+  let tree = [ 'do' ]
+  while (cursor < code.length) {
+    tree.push(readToken(nextChar, rewind, tokenizers))
+  }
+  return tree
 }
 
 module.exports = parse

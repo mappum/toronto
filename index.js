@@ -1,9 +1,9 @@
 'use strict'
 
-let parse = require('./parse.js')
-let expand = require('./expand.js')
-let defaultMacros = require('./macros.js')
-let defaultTokenizers = require('./tokenizers.js')
+let parse = require('./src/parse.js')
+let expand = require('./src/expand.js')
+let defaultMacros = require('./src/macros.js')
+let defaultTokenizers = require('./src/tokenizers.js')
 
 function evalExpansion (code, macros, tokenizers = defaultTokenizers) {
   let ctx = (this === global ? {} : this) || {}

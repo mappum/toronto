@@ -4,7 +4,7 @@
   "description": "A lisp that compiles to JS",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "nyc tape test/*.js | faucet && nyc report"
   },
   "repository": {
     "type": "git",
@@ -18,5 +18,10 @@
   "bugs": {
     "url": "https://github.com/mappum/toronto/issues"
   },
-  "homepage": "https://github.com/mappum/toronto#readme"
+  "homepage": "https://github.com/mappum/toronto#readme",
+  "devDependencies": {
+    "faucet": "0.0.1",
+    "nyc": "^11.0.3",
+    "tape": "^4.7.0"
+  }
 }

@@ -106,6 +106,11 @@ let macros = {
   },
   '[]' (...args) {
     return args
+  },
+  'do' (...expressions) {
+    return '((function () {\n  ' +
+      expressions.join(';\n  ') +
+      ';\n})())'
   }
 }
 
