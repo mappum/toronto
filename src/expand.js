@@ -1,31 +1,31 @@
 'use strict'
 
-module.exports = function expand (tree, macros) {
-  if (!Array.isArray(tree)) {
+module.exports = function expand (input, ops) {
+  if (!Array.isArray(input)) {
     // static value
-    return tree
+    return input
   }
 
-  // expandable expression
-  let expansion = []
-  for (let expression of tree) {
-    let childExpansion = expand(expression, macros)
-    if (expansion.length === 0 && Array.isArray(childExpansion)) {
-      // first list element,
-      // JS code expansion gets evalled at expansion time
-      childExpansion = eval(childExpansion)
+  // input is a list expression, get operator
+  let [ operator, ...args ] = input
+  let operatorFunc
+  if (Array.isArray(operator)) {
+    operatorFunc = eval(expand(operator, ops))
+  } else {
+    operatorFunc = ops[operator]
+    if (!operatorFunc) {
+      throw Error(`Operator "${operator}" not found`)
     }
-    expansion.push(childExpansion)
   }
-  let [ operator, ...args ] = expansion
 
-  if (typeof operator === 'function') {
-    // if operator expanded to a function,
-    // this expression should be a call
-    args.unshift(operator)
-    operator = 'call'
+  let isMacro = operatorFunc['__toronto_macro__']
+  if (isMacro) {
+    let a = operatorFunc(...args)
+    // pass unexpanded args to macro
+    return expand(a, ops)
   }
-  let macro = macros[operator]
-  if (!macro) throw Error(`macro "${operator}" not found`)
-  return macro(...args)
+
+  // recursively expand args then pass to operator function
+  args = args.map((arg) => expand(arg, ops))
+  return operatorFunc(...args)
 }

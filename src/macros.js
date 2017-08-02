@@ -18,6 +18,11 @@ function mapIterator (func, iterator) {
   return output
 }
 
+function Macro (func) {
+  func['__toronto_macro__'] = true
+  return func
+}
+
 function arrayToString () {
   return `[${this.join(',')}]`
 }
@@ -95,9 +100,9 @@ let macros = {
       params = []
     }
     if (!Array.isArray(params)) {
-      throw Error('function parameters must be a vector')
+      throw Error('function parameters must be an array')
     }
-    return eval(`(function (${params.join(', ')}) { return ${body} })`)
+    return `(function (${params.join(', ')}) { return ${body} })`
   },
   'call' (func, ...args) {
     return `((${func})(${args.join(', ')}))`
@@ -134,12 +139,16 @@ let macros = {
     return `{\n${json}\n}`
   },
   'do' (...expressions) {
-    return '((function () {\n  ' +
-      expressions.join(';\n  ') +
-      ';\n})())'
+    return `(${expressions.join(', ')})`
   },
   'eval' (code) {
     return eval(code)
+  },
+  'macro' (...args) {
+    return `((${Macro})(${macros.func(...args)}))`
+  },
+  '=' (name, value) {
+    return `(${name} = ${value})`
   }
 }
 
