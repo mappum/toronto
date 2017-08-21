@@ -1,7 +1,9 @@
 'use strict'
 
 let parse = require('./src/parse.js')
+let parseIndented = parse.parseIndented
 let expand = require('./src/expand.js')
+let bracketize = require('./src/bracketize.js')
 let defaultMacros = require('./src/macros.js')
 let defaultTokenizers = require('./src/tokenizers.js')
 
@@ -19,25 +21,29 @@ function evalExpansion (code, macros, tokenizers = defaultTokenizers) {
     ctx = code
     macros = defaultMacros(ctx)
     return attachMethods(function evalExpansionCtx (code) {
-      return evalExpansion.call(ctx, code, macros, tokenizers)
+      return evalExpansion.call(ctx, code, ctx || macros, tokenizers)
     })
   }
 
   let tree = parse(code, tokenizers)
-  let js = expand(tree, macros)
+  let js = expand(tree, ctx || macros)
   return new Function('ctx', `
     with (ctx) { return (${js}) }
   `).call(ctx, ctx)
 }
 
-function attachMethods (obj) {
+function attachMethods (obj, ctx) {
   return Object.assign(obj, {
     parse (code, tokenizers = defaultTokenizers) {
       return parse(code, tokenizers)
     },
-    expand (tree, macros = defaultMacros({})) {
+    parseIndented (code, tokenizers = defaultTokenizers) {
+      return parseIndented(code, tokenizers)
+    },
+    expand (tree, macros = (ctx || defaultMacros({}))) {
       return expand(tree, macros)
     },
+    bracketize,
     macros: defaultMacros,
     tokenizers: defaultTokenizers
   })
