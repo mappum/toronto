@@ -1,35 +1,37 @@
 'use strict'
 
 let parse = require('./src/parse.js')
-let parseIndented = parse.parseIndented
 let expand = require('./src/expand.js')
 let bracketize = require('./src/bracketize.js')
-let defaultMacros = require('./src/macros.js')
+let defaultOperators = require('./src/operators.js')
 let defaultTokenizers = require('./src/tokenizers.js')
 
-function evalExpansion (code, macros, tokenizers = defaultTokenizers) {
-  let ctx = (this === global ? {} : this) || {}
-  if (!macros) macros = defaultMacros(ctx)
+let opWrapperSymbol = Symbol('toronto_ops')
 
+function evalExpansion (code, ops, tokenizers = defaultTokenizers) {
   if (Array.isArray(code)) {
     // called as template string tag
     code = String.raw(...Array.from(arguments))
-    macros = defaultMacros(ctx)
+    ops = defaultOperators()
     tokenizers = defaultTokenizers
   } else if (typeof code === 'object') {
     // return eval function, bound to context object
-    ctx = code
-    macros = defaultMacros(ctx)
+    let ctx = code
+    if (!ctx[opWrapperSymbol]) {
+      ctx[opWrapperSymbol] = defaultOperators(ctx)
+    }
+    ops = ctx[opWrapperSymbol]
     return attachMethods(function evalExpansionCtx (code) {
-      return evalExpansion.call(ctx, code, ctx || macros, tokenizers)
+      if (Array.isArray(code)) {
+        code = String.raw(...Array.from(arguments))
+      }
+      return evalExpansion.call(ops, code, ops, tokenizers)
     })
   }
 
   let tree = parse(code, tokenizers)
-  let js = expand(tree, ctx || macros)
-  return new Function('ctx', `
-    with (ctx) { return (${js}) }
-  `).call(ctx, ctx)
+  let js = expand.call(ops, tree, ops)
+  return new Function(js).call(ops)
 }
 
 function attachMethods (obj, ctx) {
@@ -37,14 +39,11 @@ function attachMethods (obj, ctx) {
     parse (code, tokenizers = defaultTokenizers) {
       return parse(code, tokenizers)
     },
-    parseIndented (code, tokenizers = defaultTokenizers) {
-      return parseIndented(code, tokenizers)
-    },
-    expand (tree, macros = (ctx || defaultMacros({}))) {
-      return expand(tree, macros)
+    expand (tree, ops = (ctx || defaultOperators({}))) {
+      return expand(tree, ops)
     },
     bracketize,
-    macros: defaultMacros,
+    operators: defaultOperators,
     tokenizers: defaultTokenizers
   })
 }
