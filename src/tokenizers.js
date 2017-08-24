@@ -61,6 +61,15 @@ function prefixed (prefix, tokenizer, transform = noop) {
 let parantheticExpression = bracketed('(', ')')
 
 let tokenizers = [
+  // comments (; or //)
+  function comments (nextChar, rewind) {
+    let char = nextChar()
+    if (char !== ';' && char !== '/') return rewind()
+    if (char === '/' && nextChar() !== '/') return rewind(2)
+    // read until newline
+    do { char = nextChar() } while (char && char !== '\n')
+    return [ 'eval', 'undefined' ]
+  },
   // normal paranthetic expressions
   parantheticExpression,
   // paranthetic expressions prefixed with period (to eval at expansion-time)

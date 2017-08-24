@@ -16,10 +16,11 @@ function parse (code, tokenizers) {
   code = code.trim()
   let cursor = 0
   let nextChar = () => code[cursor++]
-  let rewind = (n = 1) => cursor -= n
+  let rewind = (n = 1) => { cursor -= n }
   let tree = [ 'do' ]
   while (cursor < code.length) {
-    tree.push(readToken(nextChar, rewind, tokenizers))
+    let token = readToken(nextChar, rewind, tokenizers)
+    if (token) tree.push(token)
   }
   if (tree.length === 2) return tree[1]
   return tree
