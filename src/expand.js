@@ -10,7 +10,8 @@ module.exports = function expand (input, ops) {
   let [ operator, ...args ] = input
   let operatorFunc
   if (Array.isArray(operator)) {
-    operatorFunc = eval(expand(operator, ops))
+    let expansion = expand.call(ops, operator, ops)
+    operatorFunc = new Function(expansion).bind(ops)
   } else {
     operatorFunc = ops[operator]
     if (!operatorFunc) {
@@ -22,7 +23,7 @@ module.exports = function expand (input, ops) {
   if (isMacro) {
     let a = operatorFunc(...args)
     // pass unexpanded args to macro
-    return expand(a, ops)
+    return expand.call(ops, a, ops)
   }
 
   // recursively expand args then pass to operator function

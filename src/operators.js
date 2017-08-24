@@ -10,7 +10,7 @@ function * range (min = 0, max) {
   }
 }
 
-function mapIterator (func, iterator) {
+function mapIterator (iterator, func) {
   let output = []
   for (let value of iterator) {
     output.push(func(value))
@@ -29,6 +29,12 @@ function arrayToString () {
 
 function variadicBinaryOperator (operator) {
   return (...args) => `(${args.join(` ${operator} `)})`
+}
+
+function notUndefined (value) {
+  return value !== undefined &&
+    value !== '(undefined)' &&
+    value !== 'undefined'
 }
 
 let arithmetic = {
@@ -55,9 +61,9 @@ let bitwise = {
   'bnot': (value) => `(~(${value}))`
 }
 
-let macros = {
-  'map' (func, iterator) {
-    return `(${mapIterator.toString()})(${func}, ${iterator})`
+let operators = {
+  'map' (iterator, func) {
+    return `(${mapIterator.toString()})(${iterator}, ${func})`
   },
   '=>' (args, expression) {
     if (Array.isArray(args)) args = args.join(', ')
@@ -94,15 +100,12 @@ let macros = {
   ',' (...args) {
     return `${args.join(', ')}`
   },
-  'func' (params, body) {
+  'func' (params, ...body) {
     if (!body) {
       body = params
       params = []
     }
-    if (!Array.isArray(params)) {
-      throw Error('function parameters must be an array')
-    }
-    return `(function (${params.join(', ')}) { return ${body} })`
+    return `(function (${params.join(', ')}) { return (${body.join(', ')}) })`
   },
   'call' (func, ...args) {
     return `((${func})(${args.join(', ')}))`
@@ -139,44 +142,54 @@ let macros = {
     return `{\n${json}\n}`
   },
   'do' (...expressions) {
+    expressions = expressions.filter(notUndefined)
+    if (expressions.length === 0) {
+      expressions.push('undefined')
+    }
     return `(${expressions.join(', ')})`
   },
-  'eval' (code) {
-    return eval(code)
-  },
   'macro' (...args) {
-    return `((${Macro})(${macros.func(...args)}))`
+    return `((${Macro})(${operators.func(...args)}))`
   },
   '=' (name, value) {
     return `(${name} = ${value})`
   }
 }
 
-let scopedMacros = {
+let scopedOps = {
   'def' (name, value) {
-    return `(this['${name}'] = ${value})`
+    return `(this['${name}'] = ${value}, undefined)`
+  },
+  'get' (name) {
+    return `(this['${name}'])`
+  },
+  'eval' (code) {
+    let value = new Function(`return (${code})`).call(this)
+    if (value === undefined) return '(undefined)'
+    return value
   }
 }
 
 Object.assign(
-  macros,
+  operators,
   arithmetic,
   logical,
   bitwise)
 
-// exported value can be used as the collection of macros,
+// exported value can be used as the collection of operators,
 // or can be called to create a scope for 'def', etc.
-module.exports = function createMacroContext (ctx = {}) {
-  // clone then re-assign to assure ctx overrides defaults
-  let cloned = Object.assign({}, ctx)
+module.exports = function wrapContext (ctx = {}) {
+  let clonedOperators = Object.assign({}, operators)
 
-  // bind scoped macros to context
-  let boundScopedMacros = {}
-  for (let operator in scopedMacros) {
-    boundScopedMacros[operator] = scopedMacros[operator].bind(ctx)
+  let wrapper = new Proxy(ctx, {})
+  Object.setPrototypeOf(wrapper, clonedOperators)
+
+  // bind scoped operators to context
+  for (let operator in scopedOps) {
+    clonedOperators[operator] = scopedOps[operator].bind(wrapper)
   }
 
-  return Object.assign(ctx, macros, boundScopedMacros, cloned)
+  return wrapper
 }
 
-Object.assign(module.exports, { macros })
+Object.assign(module.exports, { operators })
