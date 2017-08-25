@@ -122,24 +122,22 @@ let operators = {
   },
   '{}' (...args) {
     let json = ''
-    for (let i = 0; i < args.length; i += 2) {
-      let key = args[i]
-      let value = args[i + 1]
-      // ensure keys are followed by colons
-      if (value === ':' && key[key.length - 1] !== ':') {
-        key = key + ':'
-        value = args[i + 2]
+    for (let i = 0; i < args.length;) {
+      let key, value
+      let [ a, b ] = [ args[i], args[i + 1] ]
+      let isKey = a[a.length - 1] === ':'
+      if (isKey) {
+        key = a
+        value = b
+        i += 2
+      } else {
+        key = a + ':'
+        value = a
         i += 1
-      } else if (key[key.length - 1] !== ':') {
-        throw Error('Expected JS object key to end with ":"')
-      }
-      // make sure we don't get mistake keys for values
-      if (value[value.length - 1] === ':') {
-        throw Error('Expected JS object value to not end with ":"')
       }
       json += `  ${key} ${value},\n`
     }
-    return `{\n${json}\n}`
+    return `{\n${json}}`
   },
   'do' (...expressions) {
     expressions = expressions.filter(notUndefined)
