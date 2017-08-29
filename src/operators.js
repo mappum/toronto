@@ -37,6 +37,13 @@ function notUndefined (value) {
     value !== 'undefined'
 }
 
+function preserveTree (tree) {
+  if (!Array.isArray(tree)) return tree
+  let [ op, ...args ] = tree
+  let output = [ JSON.stringify(op), ...args.map(preserveTree) ]
+  return arrayToString.call(output)
+}
+
 let arithmetic = {
   '+': variadicBinaryOperator('+'),
   '-' (...args) {
@@ -151,7 +158,8 @@ let operators = {
   },
   '=' (name, value) {
     return `(${name} = ${value})`
-  }
+  },
+  'tree': Macro((tree) => preserveTree(tree))
 }
 
 let scopedOps = {
