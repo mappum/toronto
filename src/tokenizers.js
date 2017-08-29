@@ -89,9 +89,9 @@ let tokenizers = [
   // $(+ 5 5) -> [eval [+ 5 5]]
   prefixAlias('$', 'eval'),
 
-  // list prefixed with '%' (preserve syntax tree/don't expand)
+  // list prefixed with '%' (preserve syntax tree/list, don't expand)
   // %(+ 5 5) -> [tree [+ 5 5]] -> [ '+', 5, 5 ]
-  prefixAlias('%', 'tree'),
+  prefixAlias('%', 'list'),
 
   // list prefixed with '.' (call)
   // .(Math.sin 3.14) -> [call Math.sin 3.14]
@@ -101,8 +101,9 @@ let tokenizers = [
   // [ 1 2 3 ] -> [ 1, 2, 3 ]
   bracketed('[', ']', (args) => [ '[]', ...args ]),
 
-  // stringified expression
-  bracketed('<', '>', (args) => '`${JSON.stringify(' + args.join(' ') + ')}`'),
+  // escape expression (escape can be used by macros such as 'list')
+  // <foo> -> [escape foo]
+  bracketed('<', '>', (args) => [ 'escape', ...args ]),
 
   // JS object
   // { foo: bar baz } -> { foo: bar, baz: baz }

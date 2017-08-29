@@ -21,7 +21,7 @@ module.exports = function expand (input, ops) {
     }
   }
 
-  let isMacro = operatorFunc['__toronto_macro__']
+  let isMacro = !!operatorFunc['__toronto_macro__']
   if (isMacro) {
     let a = operatorFunc(...args)
     // pass unexpanded args to macro

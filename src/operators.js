@@ -37,11 +37,20 @@ function notUndefined (value) {
     value !== 'undefined'
 }
 
-function preserveTree (tree) {
-  if (!Array.isArray(tree)) return tree
-  let [ op, ...args ] = tree
-  let output = [ JSON.stringify(op), ...args.map(preserveTree) ]
-  return arrayToString.call(output)
+function escapeTemplateString (str) {
+  return str.replace(/`/g, '\\`')
+}
+
+function commaList (list) {
+  return list.join(', ')
+}
+
+function preserveList (list) {
+  if (!Array.isArray(list)) return JSON.stringify(list)
+  let [ op, ...args ] = list
+  // special escape operator
+  if (op === 'escape') return args[0]
+  return arrayToString.call(list.map(preserveList))
 }
 
 let arithmetic = {
@@ -73,11 +82,10 @@ let operators = {
     return `(${mapIterator.toString()})(${iterator}, ${func})`
   },
   '=>' (args, expression) {
-    if (Array.isArray(args)) args = args.join(', ')
-    return `(${args}) => (${expression})`
+    return `(${commaList(args)}) => (${expression})`
   },
   'range' (...args) {
-    return `(${range.toString()})(${args.join(', ')})`
+    return `(${range.toString()})(${commaList(args)})`
   },
   '?' (cond, a, b = undefined) {
     return `(${cond} ? ${a} : ${b})`
@@ -86,7 +94,7 @@ let operators = {
     return `!(${expression})`
   },
   'print' (...args) {
-    return `(console.log(${args.join(', ')}))`
+    return `(console.log(${commaList(args)}))`
   },
   'cond' (...args) {
     let output = ''
@@ -105,27 +113,27 @@ let operators = {
     return `(${a} || ${b})`
   },
   ',' (...args) {
-    return `${args.join(', ')}`
+    return `${commaList(args)}`
   },
   'func' (params, ...body) {
     if (!body) {
       body = params
       params = []
     }
-    return `(function func (${params.join(', ')}) { return (${body.join(', ')}) })`
+    return `(function func (${commaList(params)}) { return (${commaList(body)}) })`
   },
   'async' (params, ...body) {
     if (!body) {
       body = params
       params = []
     }
-    return `(async function _async (${params.join(', ')}) { return (${body.join(', ')}) })`
+    return `(async function _async (${commaList(params)}) { return (${commaList(body)}) })`
   },
   'await' (expression) {
     return `(await (${expression}))`
   },
   'call' (func, ...args) {
-    return `((${func})(${args.join(', ')}))`
+    return `((${func})(${commaList(args)}))`
   },
   'toArray' (iterator) {
     return `(Array.from(${iterator}))`
@@ -161,10 +169,10 @@ let operators = {
     if (expressions.length === 0) {
       expressions.push('undefined')
     }
-    return `(${expressions.join(', ')})`
+    return `(${commaList(expressions)})`
   },
   'asyncdo' (...expressions) {
-    return `(async function asyncdo () { return (${expressions.join(', ')}) })().catch(function (err) { throw err })`
+    return `(async function asyncdo () { return (${commaList(expressions)}) })().catch(function (err) { throw err })`
   },
   'macro' (...args) {
     return `((${Macro})(${operators.func(...args)}))`
@@ -172,7 +180,10 @@ let operators = {
   '=' (name, value) {
     return `(${name} = ${value})`
   },
-  'tree': Macro((tree) => preserveTree(tree))
+  'list': Macro(preserveList),
+  'escape' (value) {
+    throw Error('"escape" operator used outside of an escapable macro')
+  }
 }
 
 let scopedOps = {
