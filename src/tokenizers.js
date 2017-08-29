@@ -44,6 +44,7 @@ function bracketed (open, close, transform = noop) {
   )
 }
 
+// wraps a tokenizer to first check for a prefix string
 function prefixed (prefix, tokenizer, transform = noop) {
   return function readPrefixed (nextChar, ...extraArgs) {
     // check if token starts with prefix
@@ -58,27 +59,55 @@ function prefixed (prefix, tokenizer, transform = noop) {
   }
 }
 
-let parantheticExpression = bracketed('(', ')')
+let list = bracketed('(', ')')
+
+function prefixAlias (prefix, operator) {
+  return prefixed(prefix, list, (...args) => [ operator, ...args ])
+}
+
+function prefixAliasFlat (prefix, operator) {
+  return prefixed(prefix, list, (args) => [ operator, ...args ])
+}
+
+function nullLine (nextChar) {
+  // read until newline
+  let char
+  do { char = nextChar() } while (char && char !== '\n')
+  return [ 'eval', 'undefined' ]
+}
 
 let tokenizers = [
-  // comments (; or //)
-  function comments (nextChar, rewind) {
-    let char = nextChar()
-    if (char !== ';' && char !== '/') return rewind()
-    if (char === '/' && nextChar() !== '/') return rewind(2)
-    // read until newline
-    do { char = nextChar() } while (char && char !== '\n')
-    return [ 'eval', 'undefined' ]
-  },
-  // normal paranthetic expressions
-  parantheticExpression,
-  // paranthetic expressions prefixed with period (to eval at expansion-time)
-  prefixed('.', parantheticExpression,
-    (...args) => [ 'eval', ...args ]),
-  // square bracket vectors
+  // comments
+  prefixed(';', nullLine),
+  prefixed('//', nullLine),
+
+  // normal list
+  // (a b c) -> [a b c]
+  list,
+
+  // list prefixed with '$' (to eval at expansion-time)
+  // $(+ 5 5) -> [eval [+ 5 5]]
+  prefixAlias('$', 'eval'),
+
+  // list prefixed with '%' (preserve syntax tree/don't expand)
+  // %(+ 5 5) -> [tree [+ 5 5]] -> [ '+', 5, 5 ]
+  prefixAlias('%', 'tree'),
+
+  // list prefixed with '.' (call)
+  // .(Math.sin 3.14) -> [call Math.sin 3.14]
+  prefixAliasFlat('.', 'call'),
+
+  // array
+  // [ 1 2 3 ] -> [ 1, 2, 3 ]
   bracketed('[', ']', (args) => [ '[]', ...args ]),
+
+  // stringified expression
+  bracketed('<', '>', (args) => '`${JSON.stringify(' + args.join(' ') + ')}`'),
+
   // JS object
+  // { foo: bar baz } -> { foo: bar, baz: baz }
   bracketed('{', '}', (args) => [ '{}', ...args ]),
+
   // js strings (single-quoted or double-quoted)
   function string (nextChar) {
     let quote = nextChar()
@@ -101,6 +130,7 @@ let tokenizers = [
       value += char
     }
   },
+
   // all other tokens (identitifiers, numbers, etc),
   // separated by whitespace
   function immediate (nextChar, rewind, _, isParentEnd) {
