@@ -31,7 +31,7 @@ function evalExpansion (code, ops, tokenizers = defaultTokenizers) {
 
   let tree = parse(code, tokenizers)
   let js = expand.call(ops, tree, ops)
-  return new Function(`return (${js})`).call(ops)
+  return new Function('ctx', `with (ctx) { return (${js}) }`).call(ops, ops)
 }
 
 function attachMethods (obj, ctx) {

@@ -15,7 +15,9 @@ module.exports = function expand (input, ops) {
   } else {
     operatorFunc = ops[operator]
     if (!operatorFunc) {
-      throw Error(`Operator "${operator}" not found`)
+      // if not defined, fall back to dynamic call
+      operatorFunc = ops['call']
+      args = input
     }
   }
 
