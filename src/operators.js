@@ -112,7 +112,17 @@ let operators = {
       body = params
       params = []
     }
-    return `(function (${params.join(', ')}) { return (${body.join(', ')}) })`
+    return `(function func (${params.join(', ')}) { return (${body.join(', ')}) })`
+  },
+  'async' (params, ...body) {
+    if (!body) {
+      body = params
+      params = []
+    }
+    return `(async function _async (${params.join(', ')}) { return (${body.join(', ')}) })`
+  },
+  'await' (expression) {
+    return `(await (${expression}))`
   },
   'call' (func, ...args) {
     return `((${func})(${args.join(', ')}))`
@@ -153,6 +163,9 @@ let operators = {
     }
     return `(${expressions.join(', ')})`
   },
+  'asyncdo' (...expressions) {
+    return `(async function asyncdo () { return (${expressions.join(', ')}) })().catch(function (err) { throw err })`
+  },
   'macro' (...args) {
     return `((${Macro})(${operators.func(...args)}))`
   },
@@ -170,7 +183,7 @@ let scopedOps = {
     return `(this['${name}'])`
   },
   'eval' (code) {
-    let value = new Function(`return (${code})`).call(this)
+    let value = new Function('ctx', `with (ctx) { return (${code}) }`).call(this, this)
     if (value === undefined) return '(undefined)'
     return value
   }
