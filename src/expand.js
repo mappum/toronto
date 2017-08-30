@@ -11,14 +11,16 @@ module.exports = function expand (input, ops) {
   let operatorFunc
   if (Array.isArray(operator)) {
     let expansion = expand.call(ops, operator, ops)
-    operatorFunc = new Function(expansion).bind(ops)
-  } else {
-    operatorFunc = ops[operator]
-    if (!operatorFunc) {
-      // if not defined, fall back to dynamic call
-      operatorFunc = ops['call']
-      args = input
+    if (typeof expansion === 'function') {
+      return expansion.toString()
     }
+    operator = expansion
+  }
+  operatorFunc = ops[operator]
+  if (!operatorFunc) {
+    // if not defined, fall back to dynamic call
+    operatorFunc = ops['call']
+    args = input
   }
 
   let isMacro = !!operatorFunc['__toronto_macro__']
