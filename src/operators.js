@@ -129,9 +129,6 @@ let operators = {
     }
     return `(async function _async (${commaList(params)}) { return (${commaList(body)}) })`
   },
-  'await' (expression) {
-    return `(await (${expression}))`
-  },
   'call' (func, ...args) {
     return `((${func})(${commaList(args)}))`
   },
