@@ -2,7 +2,6 @@
 
 let parse = require('./src/parse.js')
 let expand = require('./src/expand.js')
-let bracketize = require('./src/bracketize.js')
 let defaultOperators = require('./src/operators.js')
 let defaultTokenizers = require('./src/tokenizers.js')
 
@@ -42,7 +41,6 @@ function attachMethods (obj, ctx) {
     expand (tree, ops = (ctx || defaultOperators({}))) {
       return expand(tree, ops)
     },
-    bracketize,
     operators: defaultOperators,
     tokenizers: defaultTokenizers
   })
