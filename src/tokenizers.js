@@ -27,6 +27,11 @@ function recursive (isStart, isEnd, transform = noop) {
 
     // read children until we reach the end of this token
     while (true) {
+      if (!nextChar()) {
+        throw Error('Unterminated expression')
+      }
+      rewind()
+
       if (wrappedIsEnd()) return transform(value)
       let child = readToken(nextChar, rewind, tokenizers, wrappedIsEnd)
       if (child) value.push(child)
@@ -74,6 +79,7 @@ function nullLine (nextChar) {
   let char
   do { char = nextChar() } while (char && char !== '\n')
   return [ 'eval', 'undefined' ]
+  // TODO: figure out a way to cleanly return null
 }
 
 let tokenizers = [
