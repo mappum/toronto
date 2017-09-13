@@ -4,7 +4,7 @@
   "description": "A lisp that compiles to JS",
   "main": "index.js",
   "scripts": {
-    "test": "nyc tape test/*.js | faucet && nyc report"
+    "test": "tape test/*.js | faucet"
   },
   "repository": {
     "type": "git",

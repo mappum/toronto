@@ -3,36 +3,96 @@
 let test = require('tape')
 let { parse } = require('..')
 
-test('parse with default tokenizers', (t) => {
-  t.test('parse top-level immediate token', (t) => {
-    let tree = parse('foo')
-    t.equal(tree, 'foo', 'correct tree')
-    t.end()
-  })
+test('simple parsing', (t) => {
+  function parseTest (name, input, expected) {
+    t.test(`parse ${name}`, (t) => {
+      let actual = parse(input)
+      t.deepEqual(actual, expected, 'correct parser output')
+      t.end()
+    })
+  }
 
-  t.test('parse top-level parenthetic expression', (t) => {
-    let tree = parse('(foo bar)')
-    t.deepEqual(tree, [ 'foo', 'bar' ], 'correct tree')
-    t.end()
-  })
+  parseTest(
+    'top-level immediate token',
+    'foo',
+    'foo')
 
-  t.test('parse top-level square bracket expression', (t) => {
-    let tree = parse('[foo bar]')
-    t.deepEqual(tree, [ '[]', 'foo', 'bar' ], 'correct tree')
-    t.end()
-  })
+  parseTest(
+    'top-level parenthetic expression',
+    '(foo bar)',
+    [ 'foo', 'bar' ])
 
-  t.test('parse nested parenthetic expression', (t) => {
-    let tree = parse('(foo (bar))')
-    t.deepEqual(tree, [ 'foo', [ 'bar' ] ], 'correct tree')
-    t.end()
-  })
+  parseTest(
+    'top-level parenthetic expression with weird spacing',
+    ' ( foo   bar  ) ',
+    [ 'foo', 'bar' ])
 
-  t.test('parse empty string', (t) => {
-    let tree = parse('')
-    t.equal(tree, '', 'correct tree')
-    t.end()
-  })
+  parseTest(
+    'top-level array expression',
+    '[foo bar baz]',
+    [ '[]', 'foo', 'bar', 'baz' ])
+
+  parseTest(
+    'top-level array expression with weird spacing',
+    ' [  foo  bar  baz ] ',
+    [ '[]', 'foo', 'bar', 'baz' ])
+
+  parseTest(
+    'top-level object expression',
+    '{foo: (bar) baz }',
+    [ '{}', 'foo:', [ 'bar' ], 'baz' ])
+
+  parseTest(
+    'top-level object expression with weird spacing',
+    ' {     foo:   (  bar  )      baz } ',
+    [ '{}', 'foo:', [ 'bar' ], 'baz' ])
+
+  parseTest(
+    'nested parenthetic expression',
+    '(foo (bar))',
+    [ 'foo', [ 'bar' ] ])
+
+  parseTest(
+    'empty string',
+    '',
+    '')
+
+  parseTest(
+    'multiline expression',
+    `
+      (foo
+        (bar (baz
+          1
+          2 3))
+      )
+    `,
+    [ 'foo',
+      [ 'bar',
+        [ 'baz', '1', '2', '3' ] ] ])
+
+  parseTest(
+    'comments',
+    `
+    ; semicolon comment
+    // slash slash comment
+    (foo
+      // (x y z)
+      a b c)
+    `,
+    [ 'foo', 'a', 'b', 'c' ])
+
+  parseTest(
+    'shorthand prefixes',
+    '(burrito $(taco) %(nacho <queso>))',
+    [ 'burrito',
+      [ 'eval', [ 'taco' ] ],
+      [ 'list',
+        [ 'nacho', [ 'escape', 'queso' ] ] ] ])
+
+  parseTest(
+    'strings',
+    '(print "spaghetti" \'linguine\' `macaroni`)',
+    [ 'print', '"spaghetti"', "'linguine'", '`macaroni`' ])
 
   t.end()
 })
