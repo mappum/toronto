@@ -13,7 +13,7 @@ function isWhitespace (str) {
 // read child tokens, and has an end sequence
 function recursive (isStart, isEnd, transform = noop) {
   return function readRecursive (nextChar, rewind, tokenizers) {
-    if (!isStart(nextChar, rewind)) return null
+    if (!isStart(nextChar, rewind)) return
 
     let value = []
 
@@ -54,7 +54,7 @@ function prefixed (prefix, tokenizer, transform = noop) {
   return function readPrefixed (nextChar, ...extraArgs) {
     // check if token starts with prefix
     for (let i = 0; i < prefix.length; i++) {
-      if (nextChar() !== prefix[i]) return null
+      if (nextChar() !== prefix[i]) return
     }
 
     // read child token
@@ -78,8 +78,7 @@ function nullLine (nextChar) {
   // read until newline
   let char
   do { char = nextChar() } while (char && char !== '\n')
-  return [ 'eval', 'undefined' ]
-  // TODO: figure out a way to cleanly return null
+  return null
 }
 
 let tokenizers = [
@@ -99,10 +98,6 @@ let tokenizers = [
   // %(+ 5 5) -> [tree [+ 5 5]] -> [ '+', 5, 5 ]
   prefixAlias('%', 'list'),
 
-  // list prefixed with '.' (call)
-  // .(Math.sin 3.14) -> [call Math.sin 3.14]
-  prefixAliasFlat('.', 'call'),
-
   // array
   // [ 1 2 3 ] -> [ 1, 2, 3 ]
   bracketed('[', ']', (args) => [ '[]', ...args ]),
@@ -115,16 +110,19 @@ let tokenizers = [
   // { foo: bar baz } -> { foo: bar, baz: baz }
   bracketed('{', '}', (args) => [ '{}', ...args ]),
 
-  // js strings (single-quoted or double-quoted)
+  // js strings (single-quoted, double-quoted, or template)
   function string (nextChar) {
     let quote = nextChar()
-    if (quote !== "'" && quote !== '"') return null
+    if (!["'", '"', '`'].includes(quote)) return
     let value = ''
     let escaped = false
     while (true) {
       let char = nextChar()
       if (!char) {
-        let type = quote === '"' ? 'double' : 'single'
+        let type =
+          quote === '"' ? 'double' :
+          quote === "'" ? 'single' :
+          'backtick'
         throw Error(`unterminated ${type}-quoted string`)
       }
       if (!escaped && char === '\\') {
