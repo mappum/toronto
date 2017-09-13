@@ -208,8 +208,11 @@ Object.assign(
 module.exports = function wrapContext (ctx = {}) {
   let clonedOperators = Object.assign({}, operators)
 
-  let wrapper = new Proxy(ctx, {})
-  Object.setPrototypeOf(wrapper, clonedOperators)
+  let wrapper = new Proxy(ctx, {
+    get (target, property, receiver) {
+      return clonedOperators[property] || target[property]
+    }
+  })
 
   // bind scoped operators to context
   for (let operator in scopedOps) {
