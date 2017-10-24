@@ -1,5 +1,7 @@
 'use strict'
 
+let { scopedEval } = require('./common.js')
+
 function * range (min = 0, max) {
   if (max == null) {
     max = min
@@ -67,7 +69,9 @@ let arithmetic = {
 let logical = {
   'or': variadicBinaryOperator('||'),
   'and': variadicBinaryOperator('&&'),
-  'not': (value) => `(!(${value}))`
+  'not': (value) => `(!(${value}))`,
+  '===': variadicBinaryOperator('==='),
+  '==': variadicBinaryOperator('==')
 }
 
 let bitwise = {
@@ -191,7 +195,7 @@ let scopedOps = {
     return `(this['${name}'])`
   },
   'eval' (code) {
-    let value = new Function('ctx', `with (ctx) { return (${code}) }`).call(this, this)
+    let value = scopedEval(code, this)
     if (value === undefined) return '(undefined)'
     return value
   }

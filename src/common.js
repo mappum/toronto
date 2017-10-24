@@ -19,4 +19,14 @@ function createCharReader (nextChar, rewind) {
   }
 }
 
-module.exports = { createCharReader }
+function scopedEval (code, ctx) {
+  return (function (code) {
+    'use strict'
+    return eval(code)
+  }).call(ctx, code)
+}
+
+module.exports = {
+  createCharReader,
+  scopedEval
+}

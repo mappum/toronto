@@ -1,0 +1,8 @@
+(def to (require './src/main.js'))
+(= (. (get to) req) (require './src/require.js'))
+(= module.exports (get to))
+
+; load non-core operators
+(Object.assign
+  (. (require './src/operators.js') operators)
+  ((. (get to) req) './src/operators/def.to'))
