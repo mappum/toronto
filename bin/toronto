@@ -1,0 +1,13 @@
+#!/usr/bin/env node
+
+require('..')`
+(def repl (require 'repl'))
+(def to (require '..'))
+
+(defn _eval [cmd ctx filename cb]
+  (cb null (to cmd)))
+
+(repl.start {
+  prompt: 'toronto> '
+  eval: _eval })
+`
