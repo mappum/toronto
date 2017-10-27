@@ -184,6 +184,33 @@ let operators = {
   'list': Macro(preserveList),
   'escape' (value) {
     throw Error('"escape" operator used outside of an escapable macro')
+  },
+  'try' (tryBlock, catchBlock) {
+    return `
+      ((function trycatch () {
+        try {
+          return (${tryBlock})
+        } catch (err) {
+          (${catchBlock})(err)
+        }
+      })())
+      `
+  },
+  'throw' (err) {
+    return `((function () { throw (${err}) })())`
+  },
+  'new' (ctor, ...args) {
+    return `(new ${ctor}(${commaList(args)}))`
+  },
+  'let' (...args) {
+    let body = args[args.length - 1].trim()
+    args = args.slice(0, args.length - 1)
+    let head = '', tail = ''
+    for (let i = 0; i < args.length; i += 2) {
+      head += `((function _let (${args[i]}) {\n`
+      tail = `\n})(${args[i + 1]}))` + tail
+    }
+    return `(${head} return (${body}) ${tail})`
   }
 }
 

@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 
 require('..')`
-(def repl (require 'repl'))
-(def to (require '..'))
+(let
+  to (require '..')
+  repl (require 'repl')
+  _eval (func [cmd ctx filename cb]
+    (try
+      (cb null (to cmd))
+      (=> [err]
+        (? (=== err.message 'Unterminated expression')
+          (cb (new repl.Recoverable err))
+          (cb err)))))
 
-(defn _eval [cmd ctx filename cb]
-  (cb null (to cmd)))
-
-(repl.start {
-  prompt: 'toronto> '
-  eval: _eval })
+  (repl.start {
+    prompt: 'toronto> '
+    eval: _eval }))
 `
