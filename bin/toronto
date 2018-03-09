@@ -4,15 +4,16 @@ require('..')`
 (let
   to (require '..')
   repl (require 'repl')
-  _eval (func [cmd ctx filename cb]
-    (try
-      (cb null (to cmd))
-      (=> [err]
-        (? (=== err.message 'Unterminated expression')
-          (cb (new repl.Recoverable err))
-          (cb err)))))
 
   (repl.start {
     prompt: 'toronto> '
-    eval: _eval }))
+    eval: (func [cmd ctx filename cb]
+      (try
+        (? (process.argv.includes '--js')
+          (cb null (to.expand (to.parse cmd)))
+          (cb null (to cmd)))
+        (=> [err]
+          (? (=== err.message 'Unterminated expression')
+            (cb (new repl.Recoverable err))
+            (cb err))))) }))
 `
